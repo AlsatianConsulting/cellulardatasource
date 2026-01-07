@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Install the cell capture helper and Kismet plugin with a configurable prefix.
 # Usage:
-#   ./install.sh [--prefix /usr/local] [--install-config] [--with-collector] [--skip-multi] [--base-port 9875]
+#   ./install.sh [--prefix /usr] [--install-config] [--with-collector] [--skip-multi] [--base-port 9875]
 #
 # Defaults:
-#   PREFIX=/usr/local
+#   PREFIX=/usr
 #   Config is NOT installed unless --install-config is given
 #   Collector is NOT installed unless --with-collector is given
 #   multi_phone.sh is run to auto-forward all attached phones and write sources unless --skip-multi is given
@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-PREFIX="/usr/local"
+PREFIX="/usr"
 INSTALL_CONFIG=0
 WITH_COLLECTOR=0
 SKIP_MULTI=0

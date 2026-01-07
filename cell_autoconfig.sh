@@ -3,7 +3,7 @@
 # Intended to be run via systemd (oneshot) to keep config up to date on boot.
 set -euo pipefail
 
-PREFIX="${PREFIX:-/usr/local}"
+PREFIX="${PREFIX:-/usr}"
 BASE_PORT="${BASE_PORT:-9875}"
 GPS_PORT="${GPS_PORT:-8766}"
 FORWARD_GPS="${FORWARD_GPS:-1}"

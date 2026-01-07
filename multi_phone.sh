@@ -12,7 +12,7 @@
 set -euo pipefail
 
 BASE_PORT=9875
-PREFIX="/usr/local"
+PREFIX="/usr"
 OUT="cell_sources.conf"
 APPLY_PATH=""
 GPS_PORT=8766
