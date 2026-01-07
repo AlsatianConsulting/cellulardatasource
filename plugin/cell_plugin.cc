@@ -11,7 +11,6 @@
  * Install: make install   (or make userinstall)
  */
 
-#include <config.h>
 #include <string>
 
 #include <globalregistry.h>
