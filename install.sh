@@ -31,7 +31,7 @@ KISMET_VERSION="${KISMET_VERSION:-kismet-2025-09-R1}"
 KISMET_TARBALL_URL="${KISMET_TARBALL_URL:-https://github.com/kismetwireless/kismet/archive/refs/tags/${KISMET_VERSION}.tar.gz}"
 KISMET_SRC_ROOT="${KISMET_SRC_ROOT:-/usr/local/src}"
 KISMET_REUSE_SRC="${KISMET_REUSE_SRC:-1}"
-MAKE_JOBS="${MAKE_JOBS:-$(nproc)}"
+MAKE_JOBS="${MAKE_JOBS:-2}"
 MAKEFLAGS="${MAKEFLAGS:--j${MAKE_JOBS}}"
 
 while [[ $# -gt 0 ]]; do
