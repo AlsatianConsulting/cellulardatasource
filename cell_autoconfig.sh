@@ -30,7 +30,7 @@ trap 'rm -f "${TMP_CONF}"' EXIT
 log "Enumerating phones via adb and writing ${APPLY_PATH}"
 if ! "${BIN_DIR}/multi_phone.sh" --base-port "${BASE_PORT}" --prefix "${PREFIX}" --gps-port "${GPS_PORT}" $( [[ "${FORWARD_GPS}" == "0" ]] && echo --no-gps ) --out "${TMP_CONF}" --apply-path "${APPLY_PATH}"; then
   log "multi_phone.sh did not complete; leaving existing config untouched"
-  exit 1
+  exit 0
 fi
 
 if [[ ! -f "${KISMET_SITE_CONF}" ]]; then

@@ -47,7 +47,15 @@ fi
 mapfile -t SERIALS < <("${ADB_BIN}" devices | awk 'NR>1 && $2=="device"{print $1}')
 if [[ ${#SERIALS[@]} -eq 0 ]]; then
   echo "No attached devices" >&2
-  exit 1
+  # Still write an empty output to keep configs in sync, but do not treat as failure.
+  > "${OUT}"
+  if [[ -n "${APPLY_PATH}" ]]; then
+    install -d "$(dirname "${APPLY_PATH}")"
+    tmpfile="$(mktemp)"
+    cat "${OUT}" > "${tmpfile}"
+    mv "${tmpfile}" "${APPLY_PATH}"
+  fi
+  exit 0
 fi
 
 echo "[*] Using base port ${BASE_PORT}, prefix ${PREFIX}"
