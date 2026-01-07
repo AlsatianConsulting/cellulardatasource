@@ -25,6 +25,12 @@ FORWARD_GPS=1
 GPS_PORT=8766
 BASE_PORT=9875
 ENABLE_AUTOSTART=1
+KIS_SRC_DIR="${KIS_SRC_DIR:-}"
+KIS_INC_DIR="${KIS_INC_DIR:-}"
+KISMET_VERSION="${KISMET_VERSION:-kismet-2025-09-R1}"
+KISMET_TARBALL_URL="${KISMET_TARBALL_URL:-https://github.com/kismetwireless/kismet/archive/refs/tags/${KISMET_VERSION}.tar.gz}"
+KISMET_SRC_ROOT="${KISMET_SRC_ROOT:-/usr/local/src}"
+KISMET_REUSE_SRC="${KISMET_REUSE_SRC:-1}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -74,6 +80,55 @@ cd "${SCRIPT_DIR}"
 ./build_capture.sh
 
 echo "[*] Building plugin"
+if [[ -z "${KIS_SRC_DIR}" ]]; then
+  # Attempt to reuse existing source tree with headers
+  if [[ -n "${KIS_INC_DIR}" && -f "${KIS_INC_DIR}/globalregistry.h" ]]; then
+    KIS_SRC_DIR="${KIS_INC_DIR}"
+  elif [[ -d "${KISMET_SRC_ROOT}" ]]; then
+    # Look for an existing extracted tree
+    for cand in \
+      "${KISMET_SRC_ROOT}/${KISMET_VERSION}" \
+      "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" \
+      "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"
+    do
+      if [[ -f "${cand}/globalregistry.h" ]]; then
+        KIS_SRC_DIR="${cand}"
+        break
+      fi
+    done
+  fi
+fi
+
+if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
+  echo "[*] Kismet headers not found; fetching ${KISMET_VERSION}"
+  install -d "${KISMET_SRC_ROOT}"
+  if [[ "${KISMET_REUSE_SRC}" != "1" ]]; then
+    for old in "${KISMET_SRC_ROOT}/${KISMET_VERSION}" "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"; do
+      [[ -d "${old}" ]] && rm -rf "${old}"
+    done
+  fi
+  if [[ ! -d "${KISMET_SRC_ROOT}/${KISMET_VERSION}" && ! -d "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" && ! -d "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}" ]]; then
+    curl -fL "${KISMET_TARBALL_URL}" | tar -xz -C "${KISMET_SRC_ROOT}"
+  fi
+  for cand in \
+    "${KISMET_SRC_ROOT}/${KISMET_VERSION}" \
+    "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" \
+    "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"
+  do
+    if [[ -f "${cand}/globalregistry.h" ]]; then
+      KIS_SRC_DIR="${cand}"
+      break
+    fi
+  done
+fi
+
+if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
+  echo "[!] Unable to locate Kismet headers (globalregistry.h). Set KIS_SRC_DIR to your Kismet source tree and re-run." >&2
+  exit 1
+fi
+
+export KIS_SRC_DIR
+export KIS_INC_DIR="${KIS_INC_DIR:-${KIS_SRC_DIR}}"
 pushd "${SCRIPT_DIR}/plugin" >/dev/null
 make
 popd >/dev/null
