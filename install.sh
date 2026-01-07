@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the cell capture helper and Kismet plugin with a configurable prefix.
+# Install Kismet from source, plus the cell capture helper and plugin with a configurable prefix.
 # Usage:
 #   ./install.sh [--prefix /usr] [--install-config] [--with-collector] [--skip-multi] [--base-port 9875]
 #
@@ -31,6 +31,8 @@ KISMET_VERSION="${KISMET_VERSION:-kismet-2025-09-R1}"
 KISMET_TARBALL_URL="${KISMET_TARBALL_URL:-https://github.com/kismetwireless/kismet/archive/refs/tags/${KISMET_VERSION}.tar.gz}"
 KISMET_SRC_ROOT="${KISMET_SRC_ROOT:-/usr/local/src}"
 KISMET_REUSE_SRC="${KISMET_REUSE_SRC:-1}"
+MAKE_JOBS="${MAKE_JOBS:-$(nproc)}"
+MAKEFLAGS="${MAKEFLAGS:--j${MAKE_JOBS}}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -66,6 +68,7 @@ CONFIG_DS_DIR="${CONFIG_DIR}/datasources.d"
 SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
 
 echo "[*] Using PREFIX=${PREFIX}"
+echo "[*] Using MAKEFLAGS='${MAKEFLAGS}'"
 echo "[*] Binary will go to ${BIN_DIR}"
 echo "[*] Plugin will go to ${PLUGIN_DIR}"
 if [[ ${INSTALL_CONFIG} -eq 1 ]]; then
@@ -73,6 +76,22 @@ if [[ ${INSTALL_CONFIG} -eq 1 ]]; then
 fi
 if [[ ${WITH_COLLECTOR} -eq 1 ]]; then
   echo "[*] Collector will be installed"
+fi
+
+echo "[*] Installing build dependencies"
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y git curl ca-certificates build-essential pkg-config \
+    libprotobuf-c-dev protobuf-c-compiler libprotobuf-dev protobuf-compiler \
+    libcap-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev \
+    libmicrohttpd-dev libpcap-dev libnss3-dev libiw-dev libsqlite3-dev \
+    zlib1g-dev libnm-dev libavahi-client-dev libusb-1.0-0-dev libudev-dev \
+    libpcre2-dev libgnutls28-dev libsensors-dev libssl-dev libdw-dev \
+    libncurses-dev libzmq3-dev libbluetooth-dev libftdi1-dev \
+    libjansson-dev libwebsockets-dev librtlsdr-dev libbtbb-dev \
+    libmosquitto-dev
+else
+  echo "[!] apt-get not found; please install equivalent dependencies manually." >&2
 fi
 
 echo "[*] Building capture helper"
@@ -125,6 +144,21 @@ fi
 if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
   echo "[!] Unable to locate Kismet headers (globalregistry.h). Set KIS_SRC_DIR to your Kismet source tree and re-run." >&2
   exit 1
+fi
+
+echo "[*] Building Kismet from source at ${KIS_SRC_DIR}"
+pushd "${KIS_SRC_DIR}" >/dev/null
+if [[ -f Makefile ]]; then
+  make clean || true
+fi
+./configure --prefix="${PREFIX}"
+make ${MAKEFLAGS}
+make install
+popd >/dev/null
+
+if ! id -u kismet >/dev/null 2>&1; then
+  echo "[*] Creating kismet user"
+  useradd --system --shell /usr/sbin/nologin --home /var/lib/kismet kismet
 fi
 
 export KIS_SRC_DIR
@@ -215,6 +249,27 @@ fi
 if command -v systemctl >/dev/null 2>&1; then
   if systemctl list-unit-files | grep -q '^kismet.service'; then
     echo "[*] Enabling Kismet service"
+    systemctl enable --now kismet || true
+  else
+    echo "[*] Installing kismet.service"
+    cat > /etc/systemd/system/kismet.service <<EOF
+[Unit]
+Description=Kismet wireless IDS server
+After=network.target
+
+[Service]
+User=kismet
+Group=kismet
+ExecStart=${PREFIX}/bin/kismet --no-ncurses --config ${CONFIG_DIR}/kismet.conf
+Restart=on-failure
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
     systemctl enable --now kismet || true
   fi
 fi
