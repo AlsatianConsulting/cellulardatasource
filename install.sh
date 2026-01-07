@@ -31,8 +31,6 @@ KISMET_VERSION="${KISMET_VERSION:-kismet-2025-09-R1}"
 KISMET_TARBALL_URL="${KISMET_TARBALL_URL:-https://github.com/kismetwireless/kismet/archive/refs/tags/${KISMET_VERSION}.tar.gz}"
 KISMET_SRC_ROOT="${KISMET_SRC_ROOT:-/usr/local/src}"
 KISMET_REUSE_SRC="${KISMET_REUSE_SRC:-1}"
-MAKE_JOBS="${MAKE_JOBS:-2}"
-MAKEFLAGS="${MAKEFLAGS:--j${MAKE_JOBS}}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -68,7 +66,6 @@ CONFIG_DS_DIR="${CONFIG_DIR}/datasources.d"
 SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
 
 echo "[*] Using PREFIX=${PREFIX}"
-echo "[*] Using MAKEFLAGS='${MAKEFLAGS}'"
 echo "[*] Binary will go to ${BIN_DIR}"
 echo "[*] Plugin will go to ${PLUGIN_DIR}"
 if [[ ${INSTALL_CONFIG} -eq 1 ]]; then
@@ -152,7 +149,7 @@ if [[ -f Makefile ]]; then
   make clean || true
 fi
 ./configure --prefix="${PREFIX}"
-make ${MAKEFLAGS}
+make
 make install
 popd >/dev/null
 
