@@ -64,6 +64,7 @@ JS_DIR="${PLUGIN_DIR}/httpd/js"
 CONFIG_DIR="${PREFIX}/etc/kismet"
 CONFIG_DS_DIR="${CONFIG_DIR}/datasources.d"
 SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
+TIMER_PATH="/etc/systemd/system/kismet-cell-autosetup.timer"
 
 echo "[*] Using PREFIX=${PREFIX}"
 echo "[*] Binary will go to ${BIN_DIR}"
@@ -212,6 +213,12 @@ else
   echo "[*] Skipping multi_phone per --skip-multi"
 fi
 
+# Run autoconfig once to write datasource and GPS config (best effort)
+echo "[*] Running initial cell autoconfig"
+if ! "${BIN_DIR}/cell_autoconfig.sh"; then
+  echo "[!] cell_autoconfig.sh did not complete; you can re-run it manually" >&2
+fi
+
 cat <<EOF
 [+] Install complete.
 
@@ -240,7 +247,21 @@ ExecStart=${BIN_DIR}/cell_autoconfig.sh
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
-  systemctl enable --now kismet-cell-autosetup.service || true
+  echo "[*] Installing kismet-cell-autosetup timer"
+  cat > "${TIMER_PATH}" <<EOF
+[Unit]
+Description=Periodic Kismet cell datasource autoconfig
+
+[Timer]
+OnBootSec=10sec
+OnUnitActiveSec=30sec
+Unit=kismet-cell-autosetup.service
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now kismet-cell-autosetup.service kismet-cell-autosetup.timer || true
 fi
 
 if command -v systemctl >/dev/null 2>&1; then
