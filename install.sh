@@ -228,6 +228,12 @@ Add this line (adjust host/port if needed) to your Kismet config, e.g. ${CONFIG_
 Then restart Kismet and hard-refresh the web UI to load the cell plugin JS.
 EOF
 
+echo "[+] Install finished. Next steps:"
+echo "  1) Ensure adb forwards: adb forward tcp:9875 tcp:8765 && adb forward tcp:8766 tcp:8766"
+echo "  2) Make sure your phone feeder listens on tcp/8765 (and 8766 for NMEA)"
+echo "  3) Verify listeners: sudo ss -ltnp | egrep '(:9875|:8766)'"
+echo "  4) Restart Kismet if needed: sudo systemctl restart kismet"
+
 if [[ ${ENABLE_AUTOSTART} -eq 1 ]]; then
   echo "[*] Installing kismet-cell-autosetup systemd service"
   cat > "${SERVICE_PATH}" <<EOF
