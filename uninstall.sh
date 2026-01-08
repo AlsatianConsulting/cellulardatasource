@@ -18,6 +18,10 @@ CONFIG_DIR="${PREFIX}/etc/kismet"
 CONFIG_DS_DIR="${CONFIG_DIR}/datasources.d"
 SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
 TIMER_PATH="/etc/systemd/system/kismet-cell-autosetup.timer"
+KISMET_SERVICE="/etc/systemd/system/kismet.service"
+KISMET_BIN="${PREFIX}/bin/kismet"
+KISMET_DIR="${PREFIX}/lib/kismet"
+KISMET_SHARE_DIR="${PREFIX}/share/kismet"
 
 log() { printf '[uninstall] %s\n' "$*"; }
 
@@ -35,6 +39,11 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl stop kismet-cell-autosetup.service || true
     systemctl disable kismet-cell-autosetup.service || true
   fi
+  if systemctl list-unit-files | grep -q '^kismet.service'; then
+    log "Stopping/disabling kismet.service"
+    systemctl stop kismet || true
+    systemctl disable kismet || true
+  fi
 fi
 
 # Remove service files
@@ -44,6 +53,10 @@ for unit in "${SERVICE_PATH}" "${TIMER_PATH}"; do
     rm -f "${unit}"
   fi
 done
+if [[ -f "${KISMET_SERVICE}" ]]; then
+  log "Removing ${KISMET_SERVICE}"
+  rm -f "${KISMET_SERVICE}"
+fi
 if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
 fi
@@ -72,6 +85,17 @@ if [[ -d "${PLUGIN_DIR}" ]]; then
   rmdir "${PLUGIN_DIR}" 2>/dev/null || true
 fi
 
+# Remove Kismet binaries and data (best effort, source install)
+for f in "${KISMET_BIN}" "${PREFIX}/bin/kismet_cap_pcaplog" "${PREFIX}/bin/kismet_cap_interface" "${PREFIX}/bin/kismet_cap_nrf_mousejack"; do
+  [[ -f "${f}" ]] && { log "Removing ${f}"; rm -f "${f}"; }
+done
+for d in "${KISMET_DIR}" "${KISMET_SHARE_DIR}" "${KISMET_CONFIG_DIR}"; do
+  if [[ -d "${d}" ]]; then
+    log "Removing ${d}"
+    rm -rf "${d}"
+  fi
+done
+
 # Remove datasource config
 if [[ ${KEEP_CONFIG} -eq 0 ]]; then
   CELL_CONF="${CONFIG_DS_DIR}/cell.conf"
@@ -81,4 +105,4 @@ if [[ ${KEEP_CONFIG} -eq 0 ]]; then
   fi
 fi
 
-log "Uninstall complete. If you want to remove Kismet itself, uninstall via your package manager."
+log "Uninstall complete."
