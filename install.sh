@@ -86,7 +86,7 @@ if command -v apt-get >/dev/null 2>&1; then
     zlib1g-dev libnm-dev libavahi-client-dev libusb-1.0-0-dev libudev-dev \
     libpcre2-dev libgnutls28-dev libsensors-dev libssl-dev libdw-dev \
     libncurses-dev libzmq3-dev libbluetooth-dev libftdi1-dev \
-    libjansson-dev libwebsockets-dev librtlsdr-dev libbtbb-dev \
+    libjansson-dev libwebsockets-dev librtlsdr-dev rtl-433 libbtbb-dev \
     libmosquitto-dev
 else
   echo "[!] apt-get not found; please install equivalent dependencies manually." >&2
