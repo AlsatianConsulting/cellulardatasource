@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Uninstall the cell datasource helper, plugin, and autoconfig services.
+# Usage: PREFIX=/usr ./uninstall.sh [--keep-config]
+# Defaults: PREFIX=/usr, removes datasource config unless --keep-config is given.
+
+set -euo pipefail
+
+KEEP_CONFIG=0
+if [[ $# -gt 0 && "$1" == "--keep-config" ]]; then
+  KEEP_CONFIG=1
+fi
+
+PREFIX="${PREFIX:-/usr}"
+BIN_DIR="${PREFIX}/bin"
+PLUGIN_DIR="${PREFIX}/lib/kismet/cell"
+JS_DIR="${PLUGIN_DIR}/httpd/js"
+CONFIG_DIR="${PREFIX}/etc/kismet"
+CONFIG_DS_DIR="${CONFIG_DIR}/datasources.d"
+SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
+TIMER_PATH="/etc/systemd/system/kismet-cell-autosetup.timer"
+
+log() { printf '[uninstall] %s\n' "$*"; }
+
+log "Prefix: ${PREFIX}"
+
+# Stop/disable services
+if command -v systemctl >/dev/null 2>&1; then
+  if systemctl list-unit-files | grep -q '^kismet-cell-autosetup.timer'; then
+    log "Stopping/disabling kismet-cell-autosetup.timer"
+    systemctl stop kismet-cell-autosetup.timer || true
+    systemctl disable kismet-cell-autosetup.timer || true
+  fi
+  if systemctl list-unit-files | grep -q '^kismet-cell-autosetup.service'; then
+    log "Stopping/disabling kismet-cell-autosetup.service"
+    systemctl stop kismet-cell-autosetup.service || true
+    systemctl disable kismet-cell-autosetup.service || true
+  fi
+fi
+
+# Remove service files
+for unit in "${SERVICE_PATH}" "${TIMER_PATH}"; do
+  if [[ -f "${unit}" ]]; then
+    log "Removing ${unit}"
+    rm -f "${unit}"
+  fi
+done
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl daemon-reload || true
+fi
+
+# Remove binaries/scripts
+for f in "${BIN_DIR}/kismet_cap_cell_capture" \
+         "${BIN_DIR}/multi_phone.sh" \
+         "${BIN_DIR}/cell_autoconfig.sh"; do
+  if [[ -f "${f}" ]]; then
+    log "Removing ${f}"
+    rm -f "${f}"
+  fi
+done
+
+# Remove plugin files
+if [[ -d "${PLUGIN_DIR}" ]]; then
+  for f in "${PLUGIN_DIR}/cell.so" "${PLUGIN_DIR}/manifest.conf"; do
+    [[ -f "${f}" ]] && { log "Removing ${f}"; rm -f "${f}"; }
+  done
+  if [[ -d "${JS_DIR}" ]]; then
+    for js in "${JS_DIR}/kismet.ui.cell.js"; do
+      [[ -f "${js}" ]] && { log "Removing ${js}"; rm -f "${js}"; }
+    done
+  fi
+  rmdir "${JS_DIR}" 2>/dev/null || true
+  rmdir "${PLUGIN_DIR}" 2>/dev/null || true
+fi
+
+# Remove datasource config
+if [[ ${KEEP_CONFIG} -eq 0 ]]; then
+  CELL_CONF="${CONFIG_DS_DIR}/cell.conf"
+  if [[ -f "${CELL_CONF}" ]]; then
+    log "Removing ${CELL_CONF}"
+    rm -f "${CELL_CONF}"
+  fi
+fi
+
+log "Uninstall complete. If you want to remove Kismet itself, uninstall via your package manager."
