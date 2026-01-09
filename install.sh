@@ -144,6 +144,15 @@ if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
   exit 1
 fi
 
+if ! getent group kismet >/dev/null 2>&1; then
+  echo "[*] Creating kismet group"
+  groupadd --system kismet
+fi
+if ! id -u kismet >/dev/null 2>&1; then
+  echo "[*] Creating kismet user"
+  useradd --system --gid kismet --shell /usr/sbin/nologin --home /var/lib/kismet kismet
+fi
+
 echo "[*] Building Kismet from source at ${KIS_SRC_DIR}"
 pushd "${KIS_SRC_DIR}" >/dev/null
 if [[ -f Makefile ]]; then
@@ -153,11 +162,6 @@ fi
 make
 make install
 popd >/dev/null
-
-if ! id -u kismet >/dev/null 2>&1; then
-  echo "[*] Creating kismet user"
-  useradd --system --shell /usr/sbin/nologin --home /var/lib/kismet kismet
-fi
 
 export KIS_SRC_DIR
 export KIS_INC_DIR="${KIS_INC_DIR:-${KIS_SRC_DIR}}"
