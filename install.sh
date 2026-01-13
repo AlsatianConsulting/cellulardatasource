@@ -288,5 +288,6 @@ TimeoutStopSec=15
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
+  systemctl unmask kismet || true
   systemctl enable --now kismet || true
 fi
