@@ -4,7 +4,7 @@
 #   ./install.sh [--prefix /usr] [--install-config] [--with-collector] [--skip-multi] [--base-port 9875]
 #
 # Defaults:
-#   PREFIX=/usr/local
+#   PREFIX=/usr
 #   Config is NOT installed unless --install-config is given
 #   Collector is NOT installed unless --with-collector is given
 #   multi_phone.sh is run to auto-forward all attached phones and write sources unless --skip-multi is given
@@ -76,6 +76,22 @@ if [[ ${WITH_COLLECTOR} -eq 1 ]]; then
   echo "[*] Collector will be installed"
 fi
 
+echo "[*] Installing build dependencies"
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y git curl ca-certificates build-essential pkg-config \
+    libprotobuf-c-dev protobuf-c-compiler libprotobuf-dev protobuf-compiler \
+    libcap-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev \
+    libmicrohttpd-dev libpcap-dev libnss3-dev libiw-dev libsqlite3-dev \
+    zlib1g-dev libnm-dev libavahi-client-dev libusb-1.0-0-dev libudev-dev \
+    libpcre2-dev libgnutls28-dev libsensors-dev libssl-dev libdw-dev \
+    libncurses-dev libzmq3-dev libbluetooth-dev libftdi1-dev \
+    libjansson-dev libwebsockets-dev librtlsdr-dev rtl-433 libbtbb-dev \
+    libmosquitto-dev
+else
+  echo "[!] apt-get not found; please install equivalent dependencies manually." >&2
+fi
+
 echo "[*] Building capture helper"
 cd "${SCRIPT_DIR}"
 ./build_capture.sh
@@ -100,33 +116,50 @@ if [[ -z "${KIS_SRC_DIR}" ]]; then
   fi
 fi
 
-if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
-  echo "[*] Kismet headers not found; fetching ${KISMET_VERSION}"
-  install -d "${KISMET_SRC_ROOT}"
-  if [[ "${KISMET_REUSE_SRC}" != "1" ]]; then
-    for old in "${KISMET_SRC_ROOT}/${KISMET_VERSION}" "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"; do
-      [[ -d "${old}" ]] && rm -rf "${old}"
-    done
-  fi
-  if [[ ! -d "${KISMET_SRC_ROOT}/${KISMET_VERSION}" && ! -d "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" && ! -d "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}" ]]; then
-    curl -fL "${KISMET_TARBALL_URL}" | tar -xz -C "${KISMET_SRC_ROOT}"
-  fi
-  for cand in \
-    "${KISMET_SRC_ROOT}/${KISMET_VERSION}" \
-    "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" \
-    "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"
-  do
-    if [[ -f "${cand}/globalregistry.h" ]]; then
-      KIS_SRC_DIR="${cand}"
-      break
-    fi
+echo "[*] Fetching Kismet source (${KISMET_VERSION})"
+install -d "${KISMET_SRC_ROOT}"
+if [[ "${KISMET_REUSE_SRC}" != "1" ]]; then
+  for old in "${KISMET_SRC_ROOT}/${KISMET_VERSION}" "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"; do
+    [[ -d "${old}" ]] && rm -rf "${old}"
   done
 fi
+if [[ ! -d "${KISMET_SRC_ROOT}/${KISMET_VERSION}" && ! -d "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" && ! -d "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}" ]]; then
+  curl -fL "${KISMET_TARBALL_URL}" | tar -xz -C "${KISMET_SRC_ROOT}"
+fi
+for cand in \
+  "${KISMET_SRC_ROOT}/${KISMET_VERSION}" \
+  "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" \
+  "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"
+do
+  if [[ -f "${cand}/globalregistry.h" ]]; then
+    KIS_SRC_DIR="${cand}"
+    break
+  fi
+done
 
 if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
   echo "[!] Unable to locate Kismet headers (globalregistry.h). Set KIS_SRC_DIR to your Kismet source tree and re-run." >&2
   exit 1
 fi
+
+if ! getent group kismet >/dev/null 2>&1; then
+  echo "[*] Creating kismet group"
+  groupadd --system kismet
+fi
+if ! id -u kismet >/dev/null 2>&1; then
+  echo "[*] Creating kismet user"
+  useradd --system --gid kismet --shell /usr/sbin/nologin --home /var/lib/kismet kismet
+fi
+
+echo "[*] Building Kismet from source at ${KIS_SRC_DIR}"
+pushd "${KIS_SRC_DIR}" >/dev/null
+if [[ -f Makefile ]]; then
+  make clean || true
+fi
+./configure --prefix="${PREFIX}"
+make
+make install
+popd >/dev/null
 
 export KIS_SRC_DIR
 export KIS_INC_DIR="${KIS_INC_DIR:-${KIS_SRC_DIR}}"
@@ -147,7 +180,7 @@ install -m 755 "${SCRIPT_DIR}/kismet_cap_cell_capture" "${BIN_DIR}/"
 if [[ ${INSTALL_CONFIG} -eq 1 ]]; then
   echo "[*] Installing config sample"
   install -d "${CONFIG_DIR}"
-install -m 644 "${SCRIPT_DIR}/datasource-cell.conf.sample" "${CONFIG_DIR}/datasource-cell.conf.sample"
+  install -m 644 "${SCRIPT_DIR}/datasource-cell.conf.sample" "${CONFIG_DIR}/datasource-cell.conf.sample"
 fi
 
 if [[ ${WITH_COLLECTOR} -eq 1 ]]; then
@@ -156,19 +189,11 @@ if [[ ${WITH_COLLECTOR} -eq 1 ]]; then
   install -m 755 "${SCRIPT_DIR}/../collector.py" "${BIN_DIR}/collector.py"
 fi
 
-if ! getent group kismet >/dev/null 2>&1; then
-  echo "[*] Creating kismet group"
-  groupadd --system kismet
-fi
-if ! id -u kismet >/dev/null 2>&1; then
-  echo "[*] Creating kismet user"
-  useradd --system --gid kismet --shell /usr/sbin/nologin --home /var/lib/kismet kismet
-fi
-
 echo "[*] Ensuring Kismet config directory ${CONFIG_DIR}"
 install -d "${CONFIG_DIR}"
-if [[ ! -f "${CONFIG_DIR}/kismet.conf" ]]; then
-  echo "# Autogenerated placeholder config; populate with your settings." | sudo tee "${CONFIG_DIR}/kismet.conf" >/dev/null
+if [[ ! -f "${CONFIG_DIR}/kismet.conf" && -f "${KIS_SRC_DIR}/kismet.conf" ]]; then
+  echo "[*] Installing kismet.conf to ${CONFIG_DIR}"
+  install -m 644 "${KIS_SRC_DIR}/kismet.conf" "${CONFIG_DIR}/kismet.conf"
 fi
 
 echo "[*] Installing helper scripts"
