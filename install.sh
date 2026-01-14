@@ -57,6 +57,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_ARCH="$(uname -m)"
 
 BIN_DIR="${PREFIX}/bin"
 PLUGIN_DIR="${PREFIX}/lib/kismet/cell"
@@ -151,6 +152,14 @@ if ! id -u kismet >/dev/null 2>&1; then
   useradd --system --gid kismet --shell /usr/sbin/nologin --home /var/lib/kismet kismet
 fi
 
+# If an existing Kismet binary is for a different architecture, remove it to avoid Exec format errors.
+if [[ -x "${BIN_DIR}/kismet" ]]; then
+  if ! file -b "${BIN_DIR}/kismet" | grep -qi "${HOST_ARCH}"; then
+    echo "[*] Removing existing ${BIN_DIR}/kismet (architecture mismatch: expected ${HOST_ARCH})"
+    rm -f "${BIN_DIR}/kismet"
+  fi
+fi
+
 echo "[*] Building Kismet from source at ${KIS_SRC_DIR}"
 pushd "${KIS_SRC_DIR}" >/dev/null
 if [[ -f Makefile ]]; then
@@ -160,6 +169,16 @@ fi
 make
 make install
 popd >/dev/null
+
+# Sanity check that the installed Kismet binary matches the host architecture.
+if [[ ! -x "${BIN_DIR}/kismet" ]]; then
+  echo "[!] ${BIN_DIR}/kismet was not installed; aborting." >&2
+  exit 1
+fi
+if ! file -b "${BIN_DIR}/kismet" | grep -qi "${HOST_ARCH}"; then
+  echo "[!] Installed ${BIN_DIR}/kismet is not for ${HOST_ARCH}; please rerun on the target device." >&2
+  exit 1
+fi
 
 export KIS_SRC_DIR
 export KIS_INC_DIR="${KIS_INC_DIR:-${KIS_SRC_DIR}}"
