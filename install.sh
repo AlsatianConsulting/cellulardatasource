@@ -210,9 +210,20 @@ fi
 
 echo "[*] Ensuring Kismet config directory ${CONFIG_DIR}"
 install -d "${CONFIG_DIR}"
-if [[ ! -f "${CONFIG_DIR}/kismet.conf" && -f "${KIS_SRC_DIR}/kismet.conf" ]]; then
-  echo "[*] Installing kismet.conf to ${CONFIG_DIR}"
-  install -m 644 "${KIS_SRC_DIR}/kismet.conf" "${CONFIG_DIR}/kismet.conf"
+# Always seed a kismet.conf if it doesn't exist yet.
+if [[ ! -f "${CONFIG_DIR}/kismet.conf" ]]; then
+  if [[ -f "${KIS_SRC_DIR}/kismet.conf" ]]; then
+    echo "[*] Installing kismet.conf to ${CONFIG_DIR} from source tree"
+    install -m 644 "${KIS_SRC_DIR}/kismet.conf" "${CONFIG_DIR}/kismet.conf"
+  elif [[ -f "/usr/etc/kismet/kismet.conf" ]]; then
+    echo "[*] Installing kismet.conf to ${CONFIG_DIR} from /usr/etc/kismet"
+    install -m 644 "/usr/etc/kismet/kismet.conf" "${CONFIG_DIR}/kismet.conf"
+  elif [[ -f "/usr/share/kismet/kismet.conf" ]]; then
+    echo "[*] Installing kismet.conf to ${CONFIG_DIR} from /usr/share/kismet"
+    install -m 644 "/usr/share/kismet/kismet.conf" "${CONFIG_DIR}/kismet.conf"
+  else
+    echo "[!] No kismet.conf found to seed ${CONFIG_DIR}; Kismet will not start until one is provided." >&2
+  fi
 fi
 
 echo "[*] Installing helper scripts"
