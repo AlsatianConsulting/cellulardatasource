@@ -15,6 +15,7 @@ PLUGIN_DIR="/usr/lib/kismet/cell"
 JS_DIR="${PLUGIN_DIR}/httpd/js"
 CONFIG_DIR="/etc/kismet"
 CONFIG_DS_DIR="${CONFIG_DIR}/datasources.d"
+ALT_CONFIG_DIR="/usr/etc/kismet"
 SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
 TIMER_PATH="/etc/systemd/system/kismet-cell-autosetup.timer"
 KISMET_SERVICE="/etc/systemd/system/kismet.service"
@@ -74,6 +75,12 @@ for f in "${BIN_DIR}/kismet_cap_cell_capture" \
     rm -f "${f}"
   fi
 done
+# Remove any kismet* binaries in /usr/bin (best effort)
+if compgen -G "${BIN_DIR}/kismet*" >/dev/null; then
+  for f in ${BIN_DIR}/kismet*; do
+    [[ -f "${f}" ]] && { log "Removing ${f}"; rm -f "${f}"; }
+  done
+fi
 
 # Remove plugin files
 if [[ -d "${PLUGIN_DIR}" ]]; then
@@ -99,6 +106,11 @@ for d in "${KISMET_DIR}" "${KISMET_SHARE_DIR}" "${CONFIG_DIR}"; do
     rm -rf "${d}"
   fi
 done
+# Remove alternate config dir under /usr/etc/kismet
+if [[ -d "${ALT_CONFIG_DIR}" ]]; then
+  log "Removing ${ALT_CONFIG_DIR}"
+  rm -rf "${ALT_CONFIG_DIR}"
+fi
 # Remove source trees
 if [[ -d "${KISMET_SRC_ROOT}" ]]; then
   find "${KISMET_SRC_ROOT}" -maxdepth 1 -type d -name "kismet*" -print0 | while IFS= read -r -d '' d; do
