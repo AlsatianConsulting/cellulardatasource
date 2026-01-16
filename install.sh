@@ -299,7 +299,7 @@ EOF
   systemctl enable --now kismet-cell-autosetup.service kismet-cell-autosetup.timer || true
 fi
 
-if command -v systemctl >/dev/null 2>&1; then
+if [[ ${ENABLE_AUTOSTART} -eq 1 && -x "$(command -v systemctl)" ]]; then
   echo "[*] Installing kismet.service"
   cat > /etc/systemd/system/kismet.service <<EOF
 [Unit]
@@ -323,4 +323,6 @@ EOF
   systemctl daemon-reload
   systemctl unmask kismet || true
   systemctl enable --now kismet || true
+else
+  echo "[*] Skipping kismet.service install/enable per --no-service"
 fi
