@@ -215,6 +215,9 @@ if [[ ! -f "${CONFIG_DIR}/kismet.conf" ]]; then
   if [[ -f "${KIS_SRC_DIR}/kismet.conf" ]]; then
     echo "[*] Installing kismet.conf to ${CONFIG_DIR} from source tree"
     install -m 644 "${KIS_SRC_DIR}/kismet.conf" "${CONFIG_DIR}/kismet.conf"
+  elif [[ -f "/usr/etc/kismet.conf" ]]; then
+    echo "[*] Installing kismet.conf to ${CONFIG_DIR} from /usr/etc"
+    install -m 644 "/usr/etc/kismet.conf" "${CONFIG_DIR}/kismet.conf"
   elif [[ -f "/usr/etc/kismet/kismet.conf" ]]; then
     echo "[*] Installing kismet.conf to ${CONFIG_DIR} from /usr/etc/kismet"
     install -m 644 "/usr/etc/kismet/kismet.conf" "${CONFIG_DIR}/kismet.conf"
