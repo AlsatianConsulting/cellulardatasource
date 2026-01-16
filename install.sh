@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the cell capture helper and Kismet plugin with a configurable prefix.
 # Usage:
-#   ./install.sh [--prefix /usr] [--install-config] [--with-collector] [--skip-multi] [--base-port 9875]
+#   ./install.sh [--prefix /usr] [--install-config] [--with-collector] [--skip-multi] [--base-port 9875] [--force-kismet-build|--skip-kismet-build]
 #
 # Defaults:
 #   PREFIX=/usr
@@ -9,6 +9,7 @@
 #   Collector is NOT installed unless --with-collector is given
 #   multi_phone.sh is run to auto-forward all attached phones and write sources unless --skip-multi is given
 #   Base port for multi_phone is 9875 unless overridden
+#   Kismet build is skipped automatically when a matching binary already exists (use --force-kismet-build to rebuild)
 #
 # Paths used (under PREFIX unless otherwise noted):
 #   Plugin:   $PREFIX/lib/kismet/cell/{cell.so,manifest.conf,httpd/js/kismet.ui.cell.js}
@@ -31,6 +32,8 @@ KISMET_VERSION="${KISMET_VERSION:-kismet-2025-09-R1}"
 KISMET_TARBALL_URL="${KISMET_TARBALL_URL:-https://github.com/kismetwireless/kismet/archive/refs/tags/${KISMET_VERSION}.tar.gz}"
 KISMET_SRC_ROOT="${KISMET_SRC_ROOT:-/usr/local/src}"
 KISMET_REUSE_SRC="${KISMET_REUSE_SRC:-1}"
+BUILD_KISMET="auto" # auto | force | skip
+KIS_SRC_CONFIGURED=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,6 +53,10 @@ while [[ $# -gt 0 ]]; do
       SKIP_MULTI=1; shift 1;;
     --base-port)
       BASE_PORT="$2"; shift 2;;
+    --force-kismet-build)
+      BUILD_KISMET="force"; shift 1;;
+    --skip-kismet-build)
+      BUILD_KISMET="skip"; shift 1;;
     *)
       echo "Unknown option: $1" >&2
       exit 1;;
@@ -66,6 +73,7 @@ CONFIG_DIR="/etc/kismet"
 CONFIG_DS_DIR="${CONFIG_DIR}/datasources.d"
 SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
 TIMER_PATH="/etc/systemd/system/kismet-cell-autosetup.timer"
+KISMET_BIN="${BIN_DIR}/kismet"
 
 echo "[*] Using PREFIX=${PREFIX}"
 echo "[*] Binary will go to ${BIN_DIR}"
@@ -91,6 +99,26 @@ if command -v apt-get >/dev/null 2>&1; then
     libmosquitto-dev
 else
   echo "[!] apt-get not found; please install equivalent dependencies manually." >&2
+fi
+
+INSTALLED_KISMET_VERSION=""
+INSTALLED_KISMET_ARCH=""
+if [[ -x "${KISMET_BIN}" ]]; then
+  INSTALLED_KISMET_VERSION="$("${KISMET_BIN}" --version 2>/dev/null | head -n 1 | awk '{print $2}')"
+  INSTALLED_KISMET_ARCH="$(file -b "${KISMET_BIN}")"
+  echo "[*] Detected existing Kismet at ${KISMET_BIN} (${INSTALLED_KISMET_VERSION:-unknown version})"
+fi
+
+SHOULD_BUILD=1
+if [[ "${BUILD_KISMET}" == "skip" ]]; then
+  SHOULD_BUILD=0
+elif [[ "${BUILD_KISMET}" == "auto" && -x "${KISMET_BIN}" ]]; then
+  if [[ -n "${INSTALLED_KISMET_ARCH}" && "${INSTALLED_KISMET_ARCH}" =~ ${HOST_ARCH} ]]; then
+    echo "[*] Skipping Kismet build/install (matching binary already present; use --force-kismet-build to rebuild)."
+    SHOULD_BUILD=0
+  else
+    echo "[*] Existing Kismet binary does not match ${HOST_ARCH}; will rebuild."
+  fi
 fi
 
 echo "[*] Building capture helper"
@@ -143,6 +171,14 @@ if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${KIS_SRC_DIR}/Makefile.inc" ]]; then
+  echo "[*] Configuring Kismet source tree to generate Makefile.inc (no install yet)"
+  pushd "${KIS_SRC_DIR}" >/dev/null
+  ./configure --prefix="${PREFIX}"
+  popd >/dev/null
+  KIS_SRC_CONFIGURED=1
+fi
+
 if ! getent group kismet >/dev/null 2>&1; then
   echo "[*] Creating kismet group"
   groupadd --system kismet
@@ -162,12 +198,19 @@ fi
 
 echo "[*] Building Kismet from source at ${KIS_SRC_DIR}"
 pushd "${KIS_SRC_DIR}" >/dev/null
-if [[ -f Makefile ]]; then
-  make clean || true
+if [[ ${SHOULD_BUILD} -eq 1 ]]; then
+  if [[ -f Makefile ]]; then
+    make clean || true
+  fi
+  if [[ ${KIS_SRC_CONFIGURED} -eq 0 ]]; then
+    ./configure --prefix="${PREFIX}"
+    KIS_SRC_CONFIGURED=1
+  fi
+  make
+  make install
+else
+  echo "[*] Skipping make/install step; using existing Kismet binary."
 fi
-./configure --prefix="${PREFIX}"
-make
-make install
 popd >/dev/null
 
 # Sanity check that the installed Kismet binary matches the host architecture.
