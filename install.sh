@@ -127,6 +127,12 @@ install -d /etc/kismet/datasources.d
 cat > /etc/kismet/datasources.d/cell.conf <<EOF
 source=cell:name=cell-1,type=cell,exec=${PREFIX}/bin/kismet_cap_cell_capture:tcp://127.0.0.1:8765
 EOF
+# Ensure plugin is loaded
+SITE_CONF="/etc/kismet/kismet_site.conf"
+touch "${SITE_CONF}"
+if ! grep -q "/usr/lib/kismet/cell/manifest.conf" "${SITE_CONF}"; then
+  echo "plugin=/usr/lib/kismet/cell/manifest.conf" >> "${SITE_CONF}"
+fi
 
 log "Reloading systemd and enabling autosetup units"
 SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
@@ -176,21 +182,10 @@ if ! id -u kismet >/dev/null 2>&1; then
   useradd --system --gid kismet --home /var/lib/kismet --shell /usr/sbin/nologin kismet
 fi
 install -d -o kismet -g kismet /var/lib/kismet
+install -d -o kismet -g kismet /var/log/kismet
 
-if systemctl list-unit-files | grep -q '^kismet.service'; then
-  log "Kismet service detected; enforcing restart-on-failure and enabling at boot"
-  install -d /etc/systemd/system/kismet.service.d
-  cat > /etc/systemd/system/kismet.service.d/override.conf <<'EOF'
-[Service]
-Restart=on-failure
-RestartSec=5
-EOF
-  systemctl daemon-reload
-  systemctl unmask kismet || true
-  systemctl enable --now kismet || true
-else
-  log "Kismet systemd unit not found; creating one"
-  cat > /etc/systemd/system/kismet.service <<EOF
+log "Writing kismet.service unit with restart policy"
+cat > /etc/systemd/system/kismet.service <<EOF
 [Unit]
 Description=Kismet wireless IDS server
 After=network.target
@@ -198,7 +193,7 @@ After=network.target
 [Service]
 User=kismet
 Group=kismet
-ExecStart=${PREFIX}/bin/kismet --no-ncurses --config /etc/kismet/kismet.conf
+ExecStart=${PREFIX}/bin/kismet --no-ncurses --config /etc/kismet/kismet.conf --log-prefix /var/log/kismet
 Restart=on-failure
 RestartSec=5
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
@@ -210,8 +205,8 @@ TimeoutStopSec=15
 [Install]
 WantedBy=multi-user.target
 EOF
-  systemctl daemon-reload
-  systemctl enable --now kismet || true
-fi
+systemctl daemon-reload
+systemctl unmask kismet || true
+systemctl enable --now kismet || true
 
 log "Done. Restart Kismet if running: systemctl restart kismet"
