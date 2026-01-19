@@ -10,6 +10,7 @@
 #   multi_phone.sh is run to auto-forward all attached phones and write sources unless --skip-multi is given
 #   Base port for multi_phone is 9875 unless overridden
 #   Kismet build is skipped automatically when a matching binary already exists (use --force-kismet-build to rebuild)
+#   MAKE_JOBS can override build parallelism (default 1 to keep RAM/CPU low on small devices)
 #
 # Paths used (under PREFIX unless otherwise noted):
 #   Plugin:   $PREFIX/lib/kismet/cell/{cell.so,manifest.conf,httpd/js/kismet.ui.cell.js}
@@ -26,6 +27,7 @@ FORWARD_GPS=1
 GPS_PORT=8766
 BASE_PORT=9875
 ENABLE_AUTOSTART=1
+MAKE_JOBS="${MAKE_JOBS:-1}"
 KIS_SRC_DIR="${KIS_SRC_DIR:-}"
 KIS_INC_DIR="${KIS_INC_DIR:-}"
 KISMET_VERSION="${KISMET_VERSION:-kismet-2025-09-R1}"
@@ -78,6 +80,7 @@ KISMET_BIN="${BIN_DIR}/kismet"
 echo "[*] Using PREFIX=${PREFIX}"
 echo "[*] Binary will go to ${BIN_DIR}"
 echo "[*] Plugin will go to ${PLUGIN_DIR}"
+echo "[*] Using MAKE_JOBS=${MAKE_JOBS} for all make steps"
 if [[ ${INSTALL_CONFIG} -eq 1 ]]; then
   echo "[*] Config sample will go to ${CONFIG_DIR}"
 fi
@@ -200,14 +203,14 @@ echo "[*] Building Kismet from source at ${KIS_SRC_DIR}"
 pushd "${KIS_SRC_DIR}" >/dev/null
 if [[ ${SHOULD_BUILD} -eq 1 ]]; then
   if [[ -f Makefile ]]; then
-    make clean || true
+    make -j1 clean || true
   fi
   if [[ ${KIS_SRC_CONFIGURED} -eq 0 ]]; then
     ./configure --prefix="${PREFIX}"
     KIS_SRC_CONFIGURED=1
   fi
-  make
-  make install
+  make -j"${MAKE_JOBS}"
+  make -j"${MAKE_JOBS}" install
 else
   echo "[*] Skipping make/install step; using existing Kismet binary."
 fi
@@ -226,7 +229,7 @@ fi
 export KIS_SRC_DIR
 export KIS_INC_DIR="${KIS_INC_DIR:-${KIS_SRC_DIR}}"
 pushd "${SCRIPT_DIR}/plugin" >/dev/null
-make
+make -j"${MAKE_JOBS}"
 popd >/dev/null
 
 echo "[*] Installing plugin files"
