@@ -109,6 +109,9 @@ install -m 755 "${SCRIPT_DIR}/kismet_cap_cell_capture" "${BIN_DIR}/"
 if [[ "${WITH_COLLECTOR}" -eq 1 ]]; then
   install -m 755 "${SCRIPT_DIR}/../collector.py" "${BIN_DIR}/collector.py"
 fi
+# Helper scripts for autosetup
+install -m 755 "${SCRIPT_DIR}/multi_phone.sh" "${BIN_DIR}/multi_phone.sh"
+install -m 755 "${SCRIPT_DIR}/cell_autoconfig.sh" "${BIN_DIR}/cell_autoconfig.sh"
 
 log "Seeding kismet.conf if missing"
 install -d /etc/kismet
@@ -125,6 +128,40 @@ source=cell:name=cell-1,type=cell,exec=${PREFIX}/bin/kismet_cap_cell_capture:tcp
 EOF
 
 log "Reloading systemd and enabling autosetup units"
+SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
+TIMER_PATH="/etc/systemd/system/kismet-cell-autosetup.timer"
+if [[ ! -f "${SERVICE_PATH}" ]]; then
+  cat > "${SERVICE_PATH}" <<EOF
+[Unit]
+Description=Auto-configure Kismet cell datasource and GPS forwarding
+After=network.target
+
+[Service]
+Type=oneshot
+Environment=PREFIX=${PREFIX}
+Environment=BASE_PORT=9875
+Environment=GPS_PORT=8766
+Environment=FORWARD_GPS=1
+ExecStart=${BIN_DIR}/cell_autoconfig.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
+if [[ ! -f "${TIMER_PATH}" ]]; then
+  cat > "${TIMER_PATH}" <<EOF
+[Unit]
+Description=Periodic Kismet cell datasource autoconfig
+
+[Timer]
+OnBootSec=10sec
+OnUnitActiveSec=30sec
+Unit=kismet-cell-autosetup.service
+
+[Install]
+WantedBy=timers.target
+EOF
+fi
 systemctl daemon-reload
 systemctl enable --now kismet-cell-autosetup.service kismet-cell-autosetup.timer || true
 
@@ -140,7 +177,29 @@ EOF
   systemctl unmask kismet || true
   systemctl enable --now kismet || true
 else
-  log "Kismet systemd unit not found; ensure you start Kismet or create a unit if desired."
+  log "Kismet systemd unit not found; creating one"
+  cat > /etc/systemd/system/kismet.service <<EOF
+[Unit]
+Description=Kismet wireless IDS server
+After=network.target
+
+[Service]
+User=kismet
+Group=kismet
+ExecStart=${PREFIX}/bin/kismet --no-ncurses --config /etc/kismet/kismet.conf
+Restart=on-failure
+RestartSec=5
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+KillMode=process
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now kismet || true
 fi
 
 log "Done. Restart Kismet if running: systemctl restart kismet"
