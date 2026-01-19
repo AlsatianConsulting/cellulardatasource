@@ -82,7 +82,8 @@ fi
 for f in "${BIN_DIR}/kismet_cap_cell_capture" \
          "${BIN_DIR}/multi_phone.sh" \
          "${BIN_DIR}/cell_autoconfig.sh" \
-         "${BIN_DIR}/collector.py"; do
+         "${BIN_DIR}/collector.py" \
+         "${BIN_DIR}/uds_forwarder.py"; do
   if [[ -f "${f}" ]]; then
     log "Removing ${f}"
     rm -f "${f}"
