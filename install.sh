@@ -14,6 +14,9 @@ set -euo pipefail
 PREFIX="${PREFIX:-/usr}"
 MAKE_JOBS="${MAKE_JOBS:-1}"
 WITH_COLLECTOR="${WITH_COLLECTOR:-0}"
+KISMET_VERSION="${KISMET_VERSION:-kismet-2025-09-R1}"
+KISMET_TARBALL_URL="${KISMET_TARBALL_URL:-https://github.com/kismetwireless/kismet/archive/refs/tags/${KISMET_VERSION}.tar.gz}"
+KISMET_SRC_ROOT="${KISMET_SRC_ROOT:-/usr/local/src}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -43,11 +46,77 @@ else
   log "apt-get not available; install equivalent build deps manually."
 fi
 
-log "Building and installing cell plugin (PREFIX=${PREFIX}, MAKE_JOBS=${MAKE_JOBS})"
+log "Building capture helper"
 pushd "${SCRIPT_DIR}" >/dev/null
-MAKE_JOBS="${MAKE_JOBS}" WITH_COLLECTOR="${WITH_COLLECTOR}" \
-  ./install.sh --prefix "${PREFIX}" --skip-kismet-build --skip-multi --install-config
+./build_capture.sh
 popd >/dev/null
+
+log "Preparing Kismet source for plugin build (${KISMET_VERSION})"
+install -d "${KISMET_SRC_ROOT}"
+KIS_SRC_DIR=""
+for cand in \
+  "${KISMET_SRC_ROOT}/${KISMET_VERSION}" \
+  "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" \
+  "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"
+do
+  if [[ -f "${cand}/globalregistry.h" ]]; then
+    KIS_SRC_DIR="${cand}"
+    break
+  fi
+done
+
+if [[ -z "${KIS_SRC_DIR}" ]]; then
+  curl -fsSL "${KISMET_TARBALL_URL}" | tar -xz -C "${KISMET_SRC_ROOT}"
+  for cand in \
+    "${KISMET_SRC_ROOT}/${KISMET_VERSION}" \
+    "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" \
+    "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"
+  do
+    if [[ -f "${cand}/globalregistry.h" ]]; then
+      KIS_SRC_DIR="${cand}"
+      break
+    fi
+  done
+fi
+
+if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
+  echo "[!] Unable to locate Kismet headers (globalregistry.h) for plugin build." >&2
+  exit 1
+fi
+
+if [[ ! -f "${KIS_SRC_DIR}/Makefile.inc" ]]; then
+  log "Configuring Kismet source tree to generate Makefile.inc (no install)"
+  pushd "${KIS_SRC_DIR}" >/dev/null
+  ./configure --prefix="${PREFIX}"
+  popd >/dev/null
+fi
+
+log "Building cell plugin (using KIS_INC_DIR=${KIS_SRC_DIR}, MAKE_JOBS=${MAKE_JOBS})"
+pushd "${SCRIPT_DIR}/plugin" >/dev/null
+KIS_INC_DIR="${KIS_SRC_DIR}" KIS_SRC_DIR="${KIS_SRC_DIR}" make -j"${MAKE_JOBS}"
+popd >/dev/null
+
+PLUGIN_DIR="${PREFIX}/lib/kismet/cell"
+JS_DIR="${PLUGIN_DIR}/httpd/js"
+BIN_DIR="${PREFIX}/bin"
+
+log "Installing plugin and helper"
+install -d "${PLUGIN_DIR}" "${JS_DIR}" "${BIN_DIR}"
+install -m 444 "${SCRIPT_DIR}/plugin/manifest.conf" "${PLUGIN_DIR}/"
+install -m 755 "${SCRIPT_DIR}/plugin/cell.so" "${PLUGIN_DIR}/"
+install -m 644 "${SCRIPT_DIR}/plugin/httpd/js/kismet.ui.cell.js" "${JS_DIR}/"
+install -m 755 "${SCRIPT_DIR}/kismet_cap_cell_capture" "${BIN_DIR}/"
+if [[ "${WITH_COLLECTOR}" -eq 1 ]]; then
+  install -m 755 "${SCRIPT_DIR}/../collector.py" "${BIN_DIR}/collector.py"
+fi
+
+log "Seeding kismet.conf if missing"
+install -d /etc/kismet
+if [[ ! -f /etc/kismet/kismet.conf ]]; then
+  for seed in "${KIS_SRC_DIR}/kismet.conf" /usr/etc/kismet.conf /usr/etc/kismet/kismet.conf /usr/share/kismet/kismet.conf; do
+    [[ -f "${seed}" ]] && install -m 644 "${seed}" /etc/kismet/kismet.conf && break
+  done
+fi
 
 log "Ensuring datasource entry exists"
 install -d /etc/kismet/datasources.d
