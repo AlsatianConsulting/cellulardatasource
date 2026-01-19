@@ -16,23 +16,28 @@ REPO_URL="${REPO_URL:-https://github.com/AlsatianConsulting/cellulardatasource.g
 BRANCH="${BRANCH:-main}"
 MAKE_JOBS="${MAKE_JOBS:-1}"
 
-# Kismet repo doesn't publish every Debian codename immediately; map trixie to bookworm.
+# Kismet repo codename and path (override with KIS_REPO_CODENAME or KIS_REPO_PATH)
 CODENAME_RAW="$(lsb_release -cs)"
-CODENAME="${KIS_REPO_CODENAME:-${CODENAME_RAW}}"
-if [[ "${CODENAME}" == "trixie" ]]; then
-  CODENAME="bookworm"
-  log "Mapping Debian trixie to Kismet repo codename '${CODENAME}'"
-fi
+REPO_CODENAME="${KIS_REPO_CODENAME:-${CODENAME_RAW}}"
+REPO_PATH_BASE="https://www.kismetwireless.net/repos/apt/release"
+REPO_PATH="${KIS_REPO_PATH:-${REPO_PATH_BASE}/${REPO_CODENAME}}"
 KEYRING="/usr/share/keyrings/kismet-archive-keyring.gpg"
 SOURCELIST="/etc/apt/sources.list.d/kismet.list"
 
-log "Adding Kismet APT repo for ${CODENAME}"
+log "Selecting Kismet APT repo (${REPO_CODENAME})"
+if ! curl -fsI "${REPO_PATH}/InRelease" >/dev/null 2>&1; then
+  log "Repo path ${REPO_PATH} not found; falling back to bookworm."
+  REPO_CODENAME="bookworm"
+  REPO_PATH="${REPO_PATH_BASE}/bookworm"
+fi
+
+log "Adding Kismet APT repo: ${REPO_PATH} (${REPO_CODENAME})"
 apt-get update
 apt-get install -y ca-certificates curl gpg lsb-release
 if [[ ! -s "${KEYRING}" ]]; then
   curl -fsSL https://www.kismetwireless.net/repos/kismet-release.gpg | gpg --dearmor -o "${KEYRING}"
 fi
-echo "deb [signed-by=${KEYRING}] https://www.kismetwireless.net/repos/apt/release ${CODENAME} main" > "${SOURCELIST}"
+echo "deb [signed-by=${KEYRING}] ${REPO_PATH} ${REPO_CODENAME} main" > "${SOURCELIST}"
 
 log "Installing Kismet and capture packages (single-core builds: MAKE_JOBS=${MAKE_JOBS})"
 apt-get update
