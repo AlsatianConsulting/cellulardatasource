@@ -16,7 +16,13 @@ REPO_URL="${REPO_URL:-https://github.com/AlsatianConsulting/cellulardatasource.g
 BRANCH="${BRANCH:-main}"
 MAKE_JOBS="${MAKE_JOBS:-1}"
 
-CODENAME="$(lsb_release -cs)"
+# Kismet repo doesn't publish every Debian codename immediately; map trixie to bookworm.
+CODENAME_RAW="$(lsb_release -cs)"
+CODENAME="${KIS_REPO_CODENAME:-${CODENAME_RAW}}"
+if [[ "${CODENAME}" == "trixie" ]]; then
+  CODENAME="bookworm"
+  log "Mapping Debian trixie to Kismet repo codename '${CODENAME}'"
+fi
 KEYRING="/usr/share/keyrings/kismet-archive-keyring.gpg"
 SOURCELIST="/etc/apt/sources.list.d/kismet.list"
 
