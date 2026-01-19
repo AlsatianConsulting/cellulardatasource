@@ -41,7 +41,7 @@ if command -v apt-get >/dev/null 2>&1; then
     libpcre2-dev libgnutls28-dev libsensors-dev libssl-dev libdw-dev \
     libncurses-dev libzmq3-dev libbluetooth-dev libftdi1-dev \
     libjansson-dev libwebsockets-dev librtlsdr-dev rtl-433 libbtbb-dev \
-    libmosquitto-dev
+    libmosquitto-dev android-tools-adb
 else
   log "apt-get not available; install equivalent build deps manually."
 fi
@@ -112,6 +112,7 @@ fi
 # Helper scripts for autosetup
 install -m 755 "${SCRIPT_DIR}/multi_phone.sh" "${BIN_DIR}/multi_phone.sh"
 install -m 755 "${SCRIPT_DIR}/cell_autoconfig.sh" "${BIN_DIR}/cell_autoconfig.sh"
+install -m 755 "${SCRIPT_DIR}/uds_forwarder.py" "${BIN_DIR}/uds_forwarder.py"
 
 log "Seeding kismet.conf if missing"
 install -d /etc/kismet
@@ -164,6 +165,17 @@ EOF
 fi
 systemctl daemon-reload
 systemctl enable --now kismet-cell-autosetup.service kismet-cell-autosetup.timer || true
+
+# Ensure kismet user/group exist
+if ! getent group kismet >/dev/null 2>&1; then
+  log "Creating kismet group"
+  groupadd --system kismet
+fi
+if ! id -u kismet >/dev/null 2>&1; then
+  log "Creating kismet user"
+  useradd --system --gid kismet --home /var/lib/kismet --shell /usr/sbin/nologin kismet
+fi
+install -d -o kismet -g kismet /var/lib/kismet
 
 if systemctl list-unit-files | grep -q '^kismet.service'; then
   log "Kismet service detected; enforcing restart-on-failure and enabling at boot"
