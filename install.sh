@@ -1,99 +1,38 @@
 #!/usr/bin/env bash
-# Install the cell capture helper and Kismet plugin with a configurable prefix.
-# Usage:
-#   ./install.sh [--prefix /usr] [--install-config] [--with-collector] [--skip-multi] [--base-port 9875] [--force-kismet-build|--skip-kismet-build]
+# Install just the cellular datasource (capture helper + plugin) and wire it into an existing Kismet install.
+# Run as root on the target (e.g., Raspberry Pi) where Kismet is already installed from packages or source.
 #
-# Defaults:
-#   PREFIX=/usr
-#   Config is NOT installed unless --install-config is given
-#   Collector is NOT installed unless --with-collector is given
-#   multi_phone.sh is run to auto-forward all attached phones and write sources unless --skip-multi is given
-#   Base port for multi_phone is 9875 unless overridden
-#   Kismet build is skipped automatically when a matching binary already exists (use --force-kismet-build to rebuild)
-#   MAKE_JOBS can override build parallelism (default 1 to keep RAM/CPU low on small devices)
-#
-# Paths used (under PREFIX unless otherwise noted):
-#   Plugin:   $PREFIX/lib/kismet/cell/{cell.so,manifest.conf,httpd/js/kismet.ui.cell.js}
-#   Binary:   $PREFIX/bin/kismet_cap_cell_capture
-#   Config:   /etc/kismet/datasource-cell.conf.sample (only with --install-config)
+# Tunables (env):
+#   PREFIX (/usr default) – where Kismet is installed
+#   MAKE_JOBS (default 1) – build parallelism
+#   WITH_COLLECTOR (default 0) – set to 1 to also install collector.py
 
 set -euo pipefail
 
-PREFIX="/usr"
-INSTALL_CONFIG=0
-WITH_COLLECTOR=0
-SKIP_MULTI=0
-FORWARD_GPS=1
-GPS_PORT=8766
-BASE_PORT=9875
-ENABLE_AUTOSTART=1
-MAKE_JOBS="${MAKE_JOBS:-1}"
-KIS_SRC_DIR="${KIS_SRC_DIR:-}"
-KIS_INC_DIR="${KIS_INC_DIR:-}"
-KISMET_VERSION="${KISMET_VERSION:-kismet-2025-09-R1}"
-KISMET_TARBALL_URL="${KISMET_TARBALL_URL:-https://github.com/kismetwireless/kismet/archive/refs/tags/${KISMET_VERSION}.tar.gz}"
-KISMET_SRC_ROOT="${KISMET_SRC_ROOT:-/usr/local/src}"
-KISMET_REUSE_SRC="${KISMET_REUSE_SRC:-1}"
-BUILD_KISMET="auto" # auto | force | skip
-KIS_SRC_CONFIGURED=0
+[[ $EUID -eq 0 ]] || { echo "Run as root."; exit 1; }
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --prefix)
-      PREFIX="$2"; shift 2;;
-    --install-config)
-      INSTALL_CONFIG=1; shift 1;;
-    --with-collector)
-      WITH_COLLECTOR=1; shift 1;;
-    --no-service)
-      ENABLE_AUTOSTART=0; shift 1;;
-    --gps-port)
-      GPS_PORT="$2"; shift 2;;
-    --no-gps)
-      FORWARD_GPS=0; shift 1;;
-    --skip-multi)
-      SKIP_MULTI=1; shift 1;;
-    --base-port)
-      BASE_PORT="$2"; shift 2;;
-    --force-kismet-build)
-      BUILD_KISMET="force"; shift 1;;
-    --skip-kismet-build)
-      BUILD_KISMET="skip"; shift 1;;
-    *)
-      echo "Unknown option: $1" >&2
-      exit 1;;
-  esac
-done
+PREFIX="${PREFIX:-/usr}"
+MAKE_JOBS="${MAKE_JOBS:-1}"
+WITH_COLLECTOR="${WITH_COLLECTOR:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOST_ARCH="$(uname -m)"
 
-BIN_DIR="${PREFIX}/bin"
-PLUGIN_DIR="${PREFIX}/lib/kismet/cell"
-JS_DIR="${PLUGIN_DIR}/httpd/js"
-CONFIG_DIR="/etc/kismet"
-CONFIG_DS_DIR="${CONFIG_DIR}/datasources.d"
-SERVICE_PATH="/etc/systemd/system/kismet-cell-autosetup.service"
-TIMER_PATH="/etc/systemd/system/kismet-cell-autosetup.timer"
-KISMET_BIN="${BIN_DIR}/kismet"
+log() { printf '[%s] %s\n' "$(date +'%F %T')" "$*"; }
 
-echo "[*] Using PREFIX=${PREFIX}"
-echo "[*] Binary will go to ${BIN_DIR}"
-echo "[*] Plugin will go to ${PLUGIN_DIR}"
-echo "[*] Using MAKE_JOBS=${MAKE_JOBS} for all make steps"
-if [[ ${INSTALL_CONFIG} -eq 1 ]]; then
-  echo "[*] Config sample will go to ${CONFIG_DIR}"
-fi
-if [[ ${WITH_COLLECTOR} -eq 1 ]]; then
-  echo "[*] Collector will be installed"
-fi
+log "Adding Kismet APT repo (trixie) and installing kismet"
+apt-get update
+apt-get install -y ca-certificates curl gpg
+wget -qO- https://www.kismetwireless.net/repos/kismet-release.gpg.key | gpg --dearmor > /usr/share/keyrings/kismet-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/kismet-archive-keyring.gpg] https://www.kismetwireless.net/repos/apt/release/trixie trixie main" > /etc/apt/sources.list.d/kismet.list
+apt-get update
+apt-get install -y kismet
 
-echo "[*] Installing build dependencies"
+log "Installing build deps (minimal for plugin/helper)"
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update
-  apt-get install -y git curl ca-certificates build-essential pkg-config \
-    libprotobuf-c-dev protobuf-c-compiler libprotobuf-dev protobuf-compiler \
-    libcap-dev libnl-3-dev libnl-genl-3-dev libnl-route-3-dev \
+  apt-get install -y build-essential pkg-config git curl ca-certificates \
+    libprotobuf-c-dev protobuf-c-compiler libcap-dev \
+    libnl-3-dev libnl-genl-3-dev libnl-route-3-dev \
     libmicrohttpd-dev libpcap-dev libnss3-dev libiw-dev libsqlite3-dev \
     zlib1g-dev libnm-dev libavahi-client-dev libusb-1.0-0-dev libudev-dev \
     libpcre2-dev libgnutls28-dev libsensors-dev libssl-dev libdw-dev \
@@ -101,274 +40,38 @@ if command -v apt-get >/dev/null 2>&1; then
     libjansson-dev libwebsockets-dev librtlsdr-dev rtl-433 libbtbb-dev \
     libmosquitto-dev
 else
-  echo "[!] apt-get not found; please install equivalent dependencies manually." >&2
+  log "apt-get not available; install equivalent build deps manually."
 fi
 
-INSTALLED_KISMET_VERSION=""
-INSTALLED_KISMET_ARCH=""
-if [[ -x "${KISMET_BIN}" ]]; then
-  INSTALLED_KISMET_VERSION="$("${KISMET_BIN}" --version 2>/dev/null | head -n 1 | awk '{print $2}')"
-  INSTALLED_KISMET_ARCH="$(file -b "${KISMET_BIN}")"
-  echo "[*] Detected existing Kismet at ${KISMET_BIN} (${INSTALLED_KISMET_VERSION:-unknown version})"
-fi
-
-SHOULD_BUILD=1
-if [[ "${BUILD_KISMET}" == "skip" ]]; then
-  SHOULD_BUILD=0
-elif [[ "${BUILD_KISMET}" == "auto" && -x "${KISMET_BIN}" ]]; then
-  if [[ -n "${INSTALLED_KISMET_ARCH}" && "${INSTALLED_KISMET_ARCH}" =~ ${HOST_ARCH} ]]; then
-    echo "[*] Skipping Kismet build/install (matching binary already present; use --force-kismet-build to rebuild)."
-    SHOULD_BUILD=0
-  else
-    echo "[*] Existing Kismet binary does not match ${HOST_ARCH}; will rebuild."
-  fi
-fi
-
-echo "[*] Building capture helper"
-cd "${SCRIPT_DIR}"
-./build_capture.sh
-
-echo "[*] Building plugin"
-if [[ -z "${KIS_SRC_DIR}" ]]; then
-  # Attempt to reuse existing source tree with headers
-  if [[ -n "${KIS_INC_DIR}" && -f "${KIS_INC_DIR}/globalregistry.h" ]]; then
-    KIS_SRC_DIR="${KIS_INC_DIR}"
-  elif [[ -d "${KISMET_SRC_ROOT}" ]]; then
-    # Look for an existing extracted tree
-    for cand in \
-      "${KISMET_SRC_ROOT}/${KISMET_VERSION}" \
-      "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" \
-      "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"
-    do
-      if [[ -f "${cand}/globalregistry.h" ]]; then
-        KIS_SRC_DIR="${cand}"
-        break
-      fi
-    done
-  fi
-fi
-
-echo "[*] Fetching Kismet source (${KISMET_VERSION})"
-install -d "${KISMET_SRC_ROOT}"
-if [[ "${KISMET_REUSE_SRC}" != "1" ]]; then
-  for old in "${KISMET_SRC_ROOT}/${KISMET_VERSION}" "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"; do
-    [[ -d "${old}" ]] && rm -rf "${old}"
-  done
-fi
-if [[ ! -d "${KISMET_SRC_ROOT}/${KISMET_VERSION}" && ! -d "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" && ! -d "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}" ]]; then
-  curl -fL "${KISMET_TARBALL_URL}" | tar -xz -C "${KISMET_SRC_ROOT}"
-fi
-for cand in \
-  "${KISMET_SRC_ROOT}/${KISMET_VERSION}" \
-  "${KISMET_SRC_ROOT}/kismet-${KISMET_VERSION}" \
-  "${KISMET_SRC_ROOT}/kismet-kismet-${KISMET_VERSION}"
-do
-  if [[ -f "${cand}/globalregistry.h" ]]; then
-    KIS_SRC_DIR="${cand}"
-    break
-  fi
-done
-
-if [[ -z "${KIS_SRC_DIR}" || ! -f "${KIS_SRC_DIR}/globalregistry.h" ]]; then
-  echo "[!] Unable to locate Kismet headers (globalregistry.h). Set KIS_SRC_DIR to your Kismet source tree and re-run." >&2
-  exit 1
-fi
-
-if [[ ! -f "${KIS_SRC_DIR}/Makefile.inc" ]]; then
-  echo "[*] Configuring Kismet source tree to generate Makefile.inc (no install yet)"
-  pushd "${KIS_SRC_DIR}" >/dev/null
-  ./configure --prefix="${PREFIX}"
-  popd >/dev/null
-  KIS_SRC_CONFIGURED=1
-fi
-
-if ! getent group kismet >/dev/null 2>&1; then
-  echo "[*] Creating kismet group"
-  groupadd --system kismet
-fi
-if ! id -u kismet >/dev/null 2>&1; then
-  echo "[*] Creating kismet user"
-  useradd --system --gid kismet --shell /usr/sbin/nologin --home /var/lib/kismet kismet
-fi
-
-# If an existing Kismet binary is for a different architecture, remove it to avoid Exec format errors.
-if [[ -x "${BIN_DIR}/kismet" ]]; then
-  if ! file -b "${BIN_DIR}/kismet" | grep -qi "${HOST_ARCH}"; then
-    echo "[*] Removing existing ${BIN_DIR}/kismet (architecture mismatch: expected ${HOST_ARCH})"
-    rm -f "${BIN_DIR}/kismet"
-  fi
-fi
-
-echo "[*] Building Kismet from source at ${KIS_SRC_DIR}"
-pushd "${KIS_SRC_DIR}" >/dev/null
-if [[ ${SHOULD_BUILD} -eq 1 ]]; then
-  if [[ -f Makefile ]]; then
-    make -j1 clean || true
-  fi
-  if [[ ${KIS_SRC_CONFIGURED} -eq 0 ]]; then
-    ./configure --prefix="${PREFIX}"
-    KIS_SRC_CONFIGURED=1
-  fi
-  make -j"${MAKE_JOBS}"
-  make -j"${MAKE_JOBS}" install
-else
-  echo "[*] Skipping make/install step; using existing Kismet binary."
-fi
+log "Building and installing cell plugin (PREFIX=${PREFIX}, MAKE_JOBS=${MAKE_JOBS})"
+pushd "${SCRIPT_DIR}" >/dev/null
+MAKE_JOBS="${MAKE_JOBS}" WITH_COLLECTOR="${WITH_COLLECTOR}" \
+  ./install.sh --prefix "${PREFIX}" --skip-kismet-build --skip-multi --install-config
 popd >/dev/null
 
-# Sanity check that the installed Kismet binary matches the host architecture.
-if [[ ! -x "${BIN_DIR}/kismet" ]]; then
-  echo "[!] ${BIN_DIR}/kismet was not installed; aborting." >&2
-  exit 1
-fi
-if ! file -b "${BIN_DIR}/kismet" | grep -qi "${HOST_ARCH}"; then
-  echo "[!] Installed ${BIN_DIR}/kismet is not for ${HOST_ARCH}; please rerun on the target device." >&2
-  exit 1
-fi
-
-export KIS_SRC_DIR
-export KIS_INC_DIR="${KIS_INC_DIR:-${KIS_SRC_DIR}}"
-pushd "${SCRIPT_DIR}/plugin" >/dev/null
-make -j"${MAKE_JOBS}"
-popd >/dev/null
-
-echo "[*] Installing plugin files"
-install -d "${PLUGIN_DIR}" "${JS_DIR}"
-install -m 444 "${SCRIPT_DIR}/plugin/manifest.conf" "${PLUGIN_DIR}/"
-install -m 755 "${SCRIPT_DIR}/plugin/cell.so" "${PLUGIN_DIR}/"
-install -m 644 "${SCRIPT_DIR}/plugin/httpd/js/kismet.ui.cell.js" "${JS_DIR}/"
-
-echo "[*] Installing capture binary"
-install -d "${BIN_DIR}"
-install -m 755 "${SCRIPT_DIR}/kismet_cap_cell_capture" "${BIN_DIR}/"
-
-if [[ ${INSTALL_CONFIG} -eq 1 ]]; then
-  echo "[*] Installing config sample"
-  install -d "${CONFIG_DIR}"
-  install -m 644 "${SCRIPT_DIR}/datasource-cell.conf.sample" "${CONFIG_DIR}/datasource-cell.conf.sample"
-fi
-
-if [[ ${WITH_COLLECTOR} -eq 1 ]]; then
-  echo "[*] Installing collector.py"
-  install -d "${BIN_DIR}"
-  install -m 755 "${SCRIPT_DIR}/../collector.py" "${BIN_DIR}/collector.py"
-fi
-
-echo "[*] Ensuring Kismet config directory ${CONFIG_DIR}"
-install -d "${CONFIG_DIR}"
-# Always seed a kismet.conf if it doesn't exist yet.
-if [[ ! -f "${CONFIG_DIR}/kismet.conf" ]]; then
-  if [[ -f "${KIS_SRC_DIR}/kismet.conf" ]]; then
-    echo "[*] Installing kismet.conf to ${CONFIG_DIR} from source tree"
-    install -m 644 "${KIS_SRC_DIR}/kismet.conf" "${CONFIG_DIR}/kismet.conf"
-  elif [[ -f "/usr/etc/kismet.conf" ]]; then
-    echo "[*] Installing kismet.conf to ${CONFIG_DIR} from /usr/etc"
-    install -m 644 "/usr/etc/kismet.conf" "${CONFIG_DIR}/kismet.conf"
-  elif [[ -f "/usr/etc/kismet/kismet.conf" ]]; then
-    echo "[*] Installing kismet.conf to ${CONFIG_DIR} from /usr/etc/kismet"
-    install -m 644 "/usr/etc/kismet/kismet.conf" "${CONFIG_DIR}/kismet.conf"
-  elif [[ -f "/usr/share/kismet/kismet.conf" ]]; then
-    echo "[*] Installing kismet.conf to ${CONFIG_DIR} from /usr/share/kismet"
-    install -m 644 "/usr/share/kismet/kismet.conf" "${CONFIG_DIR}/kismet.conf"
-  else
-    echo "[!] No kismet.conf found to seed ${CONFIG_DIR}; Kismet will not start until one is provided." >&2
-  fi
-fi
-
-echo "[*] Installing helper scripts"
-install -m 755 "${SCRIPT_DIR}/multi_phone.sh" "${BIN_DIR}/multi_phone.sh"
-install -m 755 "${SCRIPT_DIR}/cell_autoconfig.sh" "${BIN_DIR}/cell_autoconfig.sh"
-
-if [[ ${SKIP_MULTI} -eq 0 ]]; then
-  echo "[*] Running multi_phone to set up sources (base port ${BASE_PORT}, gps port ${GPS_PORT})"
-  mkdir -p "${CONFIG_DS_DIR}"
-  CELL_CONF="${CONFIG_DS_DIR}/cell.conf"
-  TMP_CONF="$(mktemp)"
-  if command -v adb >/dev/null 2>&1; then
-    if "${BIN_DIR}/multi_phone.sh" --base-port "${BASE_PORT}" --prefix "${PREFIX}" --gps-port "${GPS_PORT}" $( [[ ${FORWARD_GPS} -eq 0 ]] && echo --no-gps ) --out "${TMP_CONF}" --apply-path "${CELL_CONF}"; then
-      if [[ -s "${CELL_CONF}" ]]; then
-        echo "[+] Wrote $(wc -l < "${CELL_CONF}") sources to ${CELL_CONF}"
-      else
-        echo "[!] multi_phone produced no sources; leaving ${CELL_CONF} unchanged" >&2
-      fi
-    else
-      echo "[!] multi_phone.sh did not complete; check adb/devices. You can re-run it later manually." >&2
-    fi
-  else
-    echo "[!] adb not found; skipping multi_phone. Install Android platform tools and re-run multi_phone.sh manually." >&2
-  fi
-else
-  echo "[*] Skipping multi_phone per --skip-multi"
-fi
-
-cat <<EOF
-[+] Install complete.
-
-Add this line (adjust host/port if needed) to your Kismet config, e.g. ${CONFIG_DIR}/kismet_site.conf:
-  source=cell:name=cell-1,type=cell,exec=${BIN_DIR}/kismet_cap_cell_capture:tcp://127.0.0.1:8765
-
-Then restart Kismet and hard-refresh the web UI to load the cell plugin JS.
+log "Ensuring datasource entry exists"
+install -d /etc/kismet/datasources.d
+cat > /etc/kismet/datasources.d/cell.conf <<EOF
+source=cell:name=cell-1,type=cell,exec=${PREFIX}/bin/kismet_cap_cell_capture:tcp://127.0.0.1:8765
 EOF
 
-if [[ ${ENABLE_AUTOSTART} -eq 1 ]]; then
-  echo "[*] Installing kismet-cell-autosetup systemd service"
-  cat > "${SERVICE_PATH}" <<EOF
-[Unit]
-Description=Auto-configure Kismet cell datasource and GPS forwarding
-After=network.target
+log "Reloading systemd and enabling autosetup units"
+systemctl daemon-reload
+systemctl enable --now kismet-cell-autosetup.service kismet-cell-autosetup.timer || true
 
+if systemctl list-unit-files | grep -q '^kismet.service'; then
+  log "Kismet service detected; enforcing restart-on-failure and enabling at boot"
+  install -d /etc/systemd/system/kismet.service.d
+  cat > /etc/systemd/system/kismet.service.d/override.conf <<'EOF'
 [Service]
-Type=oneshot
-Environment=PREFIX=${PREFIX}
-Environment=BASE_PORT=${BASE_PORT}
-Environment=GPS_PORT=${GPS_PORT}
-Environment=FORWARD_GPS=${FORWARD_GPS}
-ExecStart=${BIN_DIR}/cell_autoconfig.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-  echo "[*] Installing kismet-cell-autosetup timer"
-  cat > "${TIMER_PATH}" <<EOF
-[Unit]
-Description=Periodic Kismet cell datasource autoconfig
-
-[Timer]
-OnBootSec=10sec
-OnUnitActiveSec=30sec
-Unit=kismet-cell-autosetup.service
-
-[Install]
-WantedBy=timers.target
-EOF
-  systemctl daemon-reload
-  systemctl enable --now kismet-cell-autosetup.service kismet-cell-autosetup.timer || true
-fi
-
-if [[ ${ENABLE_AUTOSTART} -eq 1 && -x "$(command -v systemctl)" ]]; then
-  echo "[*] Installing kismet.service"
-  cat > /etc/systemd/system/kismet.service <<EOF
-[Unit]
-Description=Kismet wireless IDS server
-After=network.target
-
-[Service]
-User=kismet
-Group=kismet
-ExecStart=/usr/bin/kismet --no-ncurses --config /etc/kismet/kismet.conf
 Restart=on-failure
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
-NoNewPrivileges=yes
-KillMode=process
-TimeoutStopSec=15
-
-[Install]
-WantedBy=multi-user.target
+RestartSec=5
 EOF
   systemctl daemon-reload
   systemctl unmask kismet || true
   systemctl enable --now kismet || true
 else
-  echo "[*] Skipping kismet.service install/enable per --no-service"
+  log "Kismet systemd unit not found; ensure you start Kismet or create a unit if desired."
 fi
+
+log "Done. Restart Kismet if running: systemctl restart kismet"
