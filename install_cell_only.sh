@@ -19,6 +19,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 log() { printf '[%s] %s\n' "$(date +'%F %T')" "$*"; }
 
+log "Adding Kismet APT repo (trixie) and installing kismet"
+apt-get update
+apt-get install -y ca-certificates curl gpg
+wget -qO- https://www.kismetwireless.net/repos/kismet-release.gpg.key | gpg --dearmor > /usr/share/keyrings/kismet-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/kismet-archive-keyring.gpg] https://www.kismetwireless.net/repos/apt/release/trixie trixie main" > /etc/apt/sources.list.d/kismet.list
+apt-get update
+apt-get install -y kismet
+
 log "Installing build deps (minimal for plugin/helper)"
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update
