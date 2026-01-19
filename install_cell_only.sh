@@ -60,7 +60,15 @@ systemctl daemon-reload
 systemctl enable --now kismet-cell-autosetup.service kismet-cell-autosetup.timer || true
 
 if systemctl list-unit-files | grep -q '^kismet.service'; then
-  log "Kismet service detected; enabling to start at boot"
+  log "Kismet service detected; enforcing restart-on-failure and enabling at boot"
+  install -d /etc/systemd/system/kismet.service.d
+  cat > /etc/systemd/system/kismet.service.d/override.conf <<'EOF'
+[Service]
+Restart=on-failure
+RestartSec=5
+EOF
+  systemctl daemon-reload
+  systemctl unmask kismet || true
   systemctl enable --now kismet || true
 else
   log "Kismet systemd unit not found; ensure you start Kismet or create a unit if desired."
