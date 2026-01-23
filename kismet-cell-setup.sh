@@ -44,6 +44,17 @@ write_file() {
   fi
 }
 
+choose_pkg() {
+  local p
+  for p in "$@"; do
+    if apt-cache show "$p" >/dev/null 2>&1; then
+      printf '%s' "$p"
+      return 0
+    fi
+  done
+  return 1
+}
+
 PREFIX="/usr/local"
 SYSCONFDIR="${PREFIX}/etc"
 SRC_DIR="${USER_HOME}/src"
@@ -63,7 +74,6 @@ APT_PKGS=(
   libnl-3-dev
   libnl-genl-3-dev
   libcap-dev
-  libncurses5-dev
   libssl-dev
   zlib1g-dev
   libprotobuf-c-dev
@@ -71,9 +81,7 @@ APT_PKGS=(
   libwebsockets-dev
   libsqlite3-dev
   libusb-1.0-0-dev
-  libsensors4-dev
   libsystemd-dev
-  libpcre3-dev
   libreadline-dev
   libexpat1-dev
   android-sdk-platform-tools
@@ -81,6 +89,10 @@ APT_PKGS=(
 
 log "Installing packages"
 apt-get update
+PKG_NCURSES="$(choose_pkg libncurses-dev libncurses5-dev)" || die "No ncurses dev package found."
+PKG_SENSORS="$(choose_pkg libsensors-dev libsensors4-dev)" || die "No libsensors dev package found."
+PKG_PCRE="$(choose_pkg libpcre2-dev libpcre3-dev)" || die "No PCRE dev package found."
+APT_PKGS+=("${PKG_NCURSES}" "${PKG_SENSORS}" "${PKG_PCRE}")
 apt-get install -y "${APT_PKGS[@]}"
 
 install -d -m 755 "${SRC_DIR}"
