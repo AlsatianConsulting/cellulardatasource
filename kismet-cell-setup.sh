@@ -88,6 +88,8 @@ APT_PKGS=(
   autoconf
   automake
   libtool
+  libdw-dev
+  libnm-dev
   libpcap-dev
   libnl-3-dev
   libnl-genl-3-dev
@@ -95,13 +97,29 @@ APT_PKGS=(
   libssl-dev
   zlib1g-dev
   libprotobuf-c-dev
+  libprotobuf-dev
   protobuf-compiler
+  protobuf-c-compiler
   libwebsockets-dev
   libsqlite3-dev
   libusb-1.0-0-dev
   libsystemd-dev
   libreadline-dev
   libexpat1-dev
+  libubertooth-dev
+  libbtbb-dev
+  libmosquitto-dev
+  librtlsdr-dev
+  rtl-433
+  python3
+  python3-dev
+  python3-setuptools
+  python3-protobuf
+  python3-requests
+  python3-numpy
+  python3-serial
+  python3-usb
+  python3-websockets
   android-sdk-platform-tools
 )
 
