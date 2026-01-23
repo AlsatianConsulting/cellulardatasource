@@ -14,6 +14,12 @@ USER_HOME="$(getent passwd "${RUN_USER}" | awk -F: '{print $6}')"
 if [[ -z "${USER_HOME}" ]]; then
   die "Unable to resolve home directory for ${RUN_USER}."
 fi
+RUN_GROUP="$(id -gn "${RUN_USER}")"
+RUN_UID="$(id -u "${RUN_USER}")"
+RUN_GID="$(id -g "${RUN_USER}")"
+if [[ -z "${RUN_GROUP}" ]]; then
+  die "Unable to resolve group for ${RUN_USER}."
+fi
 
 if command -v runuser >/dev/null 2>&1; then
   AS_USER_PREFIX=(runuser -u "${RUN_USER}" -- env HOME="${USER_HOME}" USER="${RUN_USER}" LOGNAME="${RUN_USER}")
@@ -41,6 +47,18 @@ write_file() {
     rm -f "${tmp}"
   else
     install -m "${mode}" "${tmp}" "${dest}"
+  fi
+}
+
+fix_ownership() {
+  local path="$1"
+  if [[ -d "${path}" ]]; then
+    local cur_uid cur_gid
+    cur_uid="$(stat -c '%u' "${path}")"
+    cur_gid="$(stat -c '%g' "${path}")"
+    if [[ "${cur_uid}" != "${RUN_UID}" || "${cur_gid}" != "${RUN_GID}" ]]; then
+      chown -R "${RUN_USER}:${RUN_GROUP}" "${path}"
+    fi
   fi
 }
 
@@ -95,9 +113,17 @@ PKG_PCRE="$(choose_pkg libpcre2-dev libpcre3-dev)" || die "No PCRE dev package f
 APT_PKGS+=("${PKG_NCURSES}" "${PKG_SENSORS}" "${PKG_PCRE}")
 apt-get install -y "${APT_PKGS[@]}"
 
-install -d -m 755 "${SRC_DIR}"
+if [[ ! -d "${SRC_DIR}" ]]; then
+  install -d -m 755 -o "${RUN_USER}" -g "${RUN_GROUP}" "${SRC_DIR}"
+else
+  chown "${RUN_USER}:${RUN_GROUP}" "${SRC_DIR}"
+  chmod 755 "${SRC_DIR}"
+fi
 install -d -m 755 "${PREFIX}/bin"
 install -d -m 755 "${SYSCONFDIR}"
+
+fix_ownership "${KISMET_SRC}"
+fix_ownership "${CELL_SRC}"
 
 if [[ ! -d "${KISMET_SRC}/.git" ]]; then
   log "Cloning Kismet"
