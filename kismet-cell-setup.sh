@@ -132,7 +132,10 @@ fi
 
 log "Fetching Kismet tags"
 as_user git -C "${KISMET_SRC}" fetch --tags --prune
-LATEST_TAG="$(as_user git -C "${KISMET_SRC}" tag --list 'kismet-*' | sort -V | tail -n 1)"
+LATEST_TAG="$(as_user git -C "${KISMET_SRC}" tag --list 'kismet-20*' | sort -V | tail -n 1)"
+if [[ -z "${LATEST_TAG}" ]]; then
+  LATEST_TAG="$(as_user git -C "${KISMET_SRC}" tag --list 'kismet-*' | grep -v '^kismet-old' | sort -V | tail -n 1)"
+fi
 if [[ -z "${LATEST_TAG}" ]]; then
   die "No Kismet release tags found."
 fi
