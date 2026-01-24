@@ -161,13 +161,13 @@ log "Using Kismet tag: ${LATEST_TAG}"
 as_user git -C "${KISMET_SRC}" checkout -f "${LATEST_TAG}"
 
 log "Configuring Kismet"
-as_user bash -c "cd \"${KISMET_SRC}\" && ./configure --prefix=\"${PREFIX}\" --sysconfdir=\"${SYSCONFDIR}\""
+as_user bash -c "cd \"${KISMET_SRC}\" && ./configure --prefix=\"${PREFIX}\" --sysconfdir=\"${SYSCONFDIR}\" --with-suidgroup=root"
 
 log "Building Kismet (single core)"
 as_user bash -c "cd \"${KISMET_SRC}\" && make"
 
 log "Installing Kismet"
-bash -c "cd \"${KISMET_SRC}\" && make install INSTUSR=root INSTGRP=root"
+bash -c "cd \"${KISMET_SRC}\" && make install INSTUSR=root INSTGRP=root SUIDGROUP=root"
 ldconfig
 
 if [[ ! -d "${CELL_SRC}/.git" ]]; then
