@@ -167,7 +167,7 @@ log "Building Kismet (single core)"
 as_user bash -c "cd \"${KISMET_SRC}\" && make"
 
 log "Installing Kismet"
-bash -c "cd \"${KISMET_SRC}\" && make install"
+bash -c "cd \"${KISMET_SRC}\" && make install INSTUSR=root INSTGRP=root"
 ldconfig
 
 if [[ ! -d "${CELL_SRC}/.git" ]]; then
