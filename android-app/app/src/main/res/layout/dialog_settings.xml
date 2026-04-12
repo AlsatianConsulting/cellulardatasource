@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:id="@+id/transportModeLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Transport mode"
+        android:textStyle="bold" />
+
+    <RadioGroup
+        android:id="@+id/transportModeGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="6dp">
+
+        <RadioButton
+            android:id="@+id/radioTransportUsb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="USB" />
+
+        <RadioButton
+            android:id="@+id/radioTransportBluetooth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bluetooth" />
+
+        <RadioButton
+            android:id="@+id/radioTransportBoth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Both (USB + Bluetooth)" />
+    </RadioGroup>
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switchStreamCell"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stream cellular data"
+        android:layout_marginTop="8dp" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switchStreamGps"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stream GPS data"
+        android:layout_marginTop="8dp" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switchAutoStart"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Auto-stream on launch"
+        android:layout_marginTop="8dp" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switchStartOnBoot"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Begin on startup"
+        android:layout_marginTop="8dp" />
+
+</LinearLayout>

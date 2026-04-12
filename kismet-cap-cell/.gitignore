@@ -1,0 +1,17 @@
+# Build outputs
+kismet_cap_cell
+kismet_cap_cell_capture
+*.o
+*.so
+*.dylib
+*.a
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# OS metadata
+.DS_Store

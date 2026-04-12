@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+
+# Root workspace / IDE
+.idea/
+tmp/
+
+# Nested Android repo is committed separately
+
+# Android/Gradle
+android-app/.gradle/
+android-app/build/
+android-app/*/build/
+android-app/.idea/
+android-app/local.properties
+*.iml
+captures/
+*.apk
+*.keystore
+
+# Misc
+.DS_Store
+
+# Continuity export artifacts
+continuity/exports/

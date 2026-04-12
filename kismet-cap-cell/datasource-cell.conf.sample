@@ -1,0 +1,8 @@
+# Example source entry for Kismet to surface in the GUI.
+# Copy into /etc/kismet/datasources.d/ (or append to datasource.conf).
+#
+# Default local (UNIX socket) capture; rename as needed (cell-1, cell-2, etc).
+source=cell:name=cell-1,type=cell,exec=/usr/local/bin/kismet_cap_cell_capture:uds:/var/run/kismet/cell.sock
+
+# To enable TCP (only if you started kismet_cap_cell_capture with a TCP listener):
+# source=cell:name=cell-1,type=cell,exec=/usr/local/bin/kismet_cap_cell_capture:tcp://127.0.0.1:9876

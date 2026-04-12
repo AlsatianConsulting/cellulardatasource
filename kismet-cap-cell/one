@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Convenience wrapper for the unified one-shot installer.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${SCRIPT_DIR}/one_shot_install.sh" "$@"
