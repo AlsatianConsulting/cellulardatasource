@@ -24,3 +24,6 @@ captures/
 
 # Continuity export artifacts
 continuity/exports/
+
+# Local Play Store build/listing artifacts
+playstore/

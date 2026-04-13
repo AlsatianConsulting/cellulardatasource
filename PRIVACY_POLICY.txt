@@ -1,0 +1,60 @@
+Privacy Policy
+Effective Date: April 13, 2026
+App: Cellular Datasource
+Package: dev.alsatianconsulting.cellulardatasource
+Developer: Alsatian Consulting
+
+Cellular Datasource is a utility app that collects cellular and GPS telemetry from your Android device and streams it to destinations you configure (for example, local host tools such as Kismet via USB/ADB forwarding).
+
+1. Information We Process
+Depending on enabled features and device capabilities, the app may process:
+- Precise location data (GPS coordinates, altitude, speed, heading, accuracy)
+- Cellular telemetry (for example MCC/MNC, cell ID, TAC/LAC, PCI, signal/radio measurements)
+- Device/stream status data (timestamps, connection and service health)
+
+2. How We Use Information
+We use this information only to:
+- Provide live telemetry collection and display in the app
+- Stream telemetry to endpoints you configure
+- Support app reliability (foreground service, reconnect/restart behavior)
+
+3. Data Sharing
+- We do not operate a cloud backend that receives your telemetry by default.
+- Data is transmitted only to endpoints you configure.
+- We do not sell personal data.
+
+4. Data Retention
+- The app is designed for live streaming and operational use.
+- Persistent storage/retention is primarily controlled by downstream systems you use (for example host logs and exported files).
+- You control deletion by removing those downstream logs/files and uninstalling the app.
+
+5. Permissions
+The app may request:
+- ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, ACCESS_BACKGROUND_LOCATION
+- READ_PHONE_STATE
+- FOREGROUND_SERVICE, FOREGROUND_SERVICE_LOCATION
+- RECEIVE_BOOT_COMPLETED
+- INTERNET
+- Bluetooth permissions where applicable
+
+These permissions are used only for enabled telemetry and app operation features.
+
+6. Security
+We recommend using trusted devices, secured host environments, and protected storage for any logs/exports. No method of transmission or storage is 100% secure.
+
+7. Children's Privacy
+This app is not directed to children under 13.
+
+8. Your Choices
+You can:
+- Stop telemetry streaming at any time in the app
+- Disable permissions in Android settings
+- Uninstall the app
+
+9. Changes to This Policy
+We may update this Privacy Policy from time to time. Updates will be reflected by a new Effective Date.
+
+10. Contact
+For privacy questions, contact:
+Email: info@alsatianconsulting.com
+
