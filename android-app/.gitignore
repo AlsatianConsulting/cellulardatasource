@@ -1,0 +1,29 @@
+# IDE files
+.idea/
+*.iml
+
+# Gradle
+.gradle/
+**/build/
+
+# Local configuration
+local.properties
+
+# NDK/External builds
+.externalNativeBuild/
+.cxx/
+
+# Build outputs
+*.apk
+*.aab
+*.ap_
+captures/
+
+# Keystore files
+*.keystore
+*.jks
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def signingPropsFile = file(System.getenv("CELLULARDATASOURCE_SIGNING_PROPERTIES")
+    ?: "${System.getProperty('user.home')}/Documents/dev/keys/cellulardatasource-signing.properties")
+def signingProps = new Properties()
+if (signingPropsFile.exists()) {
+    signingPropsFile.withInputStream { signingProps.load(it) }
+}
+
+android {
+    namespace "dev.alsatianconsulting.cellulardatasource"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "dev.alsatianconsulting.cellulardatasource"
+        minSdk 26
+        targetSdk 36
+        versionCode 4
+        versionName "1.2"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(signingProps.getProperty("storeFile", ""))
+            storePassword signingProps.getProperty("storePassword", "")
+            keyAlias signingProps.getProperty("keyAlias", "")
+            keyPassword signingProps.getProperty("keyPassword", "")
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    implementation "androidx.core:core-ktx:1.12.0"
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.google.android.material:material:1.10.0"
+}

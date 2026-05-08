@@ -1,0 +1,25 @@
+# Android build outputs
+android-app/app/build/
+android-app/build/
+android-app/.gradle/
+android-app/local.properties
+*.apk
+*.aab
+*.keystore
+
+# C build outputs
+kismet_cap_cell_capture
+*.o
+*.d
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.iml

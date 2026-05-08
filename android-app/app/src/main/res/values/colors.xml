@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="orange_accent">#E87722</color>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="ic_launcher_background">#000000</color>
+    <color name="status_green">#34C759</color>
+    <color name="status_red">#FF3B30</color>
+</resources>
