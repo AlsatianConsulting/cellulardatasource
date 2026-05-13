@@ -26,6 +26,14 @@ When the Android foreground service is running, the app can collect:
 
 The app uses Android telephony and location APIs. It does not use monitor mode, does not scan Wi-Fi, and does not scan Bluetooth.
 
+##Screenshots
+**App UI** 
+<img width="1080" height="2340" alt="App_UI" src="https://github.com/user-attachments/assets/adda544a-3729-4892-9c89-4b403b947591" />
+**Kismet UI**
+<img width="508" height="1147" alt="Kismet_UI" src="https://github.com/user-attachments/assets/4be3150f-ecef-4067-ba61-8bc130ded4c0" />
+
+
+
 ## How Streaming Works
 
 Phone side:
