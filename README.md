@@ -1,5 +1,7 @@
 # Cellular Datasource for Kismet
 
+<a href="https://play.google.com/store/apps/details?id=dev.alsatianconsulting.cellulardatasource"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" height="80"></a>
+
 CellularDatasource streams Android cellular tower observations and GPS fixes into Kismet using an attached USB connection.
 
 The project contains:
